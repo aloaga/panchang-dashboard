@@ -1,0 +1,42 @@
+name: Generate Panchang Dashboard
+
+on:
+  schedule:
+    # Runs at 23:45 IST and 05:15 IST
+    - cron: '15 18 * * *'
+    - cron: '45 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install requests Pillow pytz
+
+      - name: Generate Image
+        env:
+          PROKERALA_CLIENT_ID: ${{ secrets.PROKERALA_CLIENT_ID }}
+          PROKERALA_CLIENT_SECRET: ${{ secrets.PROKERALA_CLIENT_SECRET }}
+        run: python generate_panchang.py
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
