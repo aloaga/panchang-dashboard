@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import datetime
 import pytz
 import urllib.request
+import json
 
 # 1. Download Devanagari Font
 font_path = "NotoSansDevanagari.ttf"
@@ -23,31 +24,41 @@ access_token = token_res.json().get("access_token")
 
 # 3. Fetch Data with Strict ISO Formatting
 ist = pytz.timezone('Asia/Kolkata')
-now = datetime.datetime.now(ist)
+# microsecond=0 ensures strict compliance with API timestamp expectations
+now = datetime.datetime.now(ist).replace(microsecond=0)
 
 headers = {"Authorization": f"Bearer {access_token}"}
 params = {
     "ayanamsa": 1,
     "coordinates": "22.5726,88.3639",
-    "datetime": now.strftime('%Y-%m-%dT%H:%M:%S+05:30'), # Forces accepted timezone offset
+    "datetime": now.isoformat(), 
     "la": "hi"
 }
+
+print(f"Fetching Panchang for: {now.isoformat()}")
 res = requests.get("https://api.prokerala.com/v2/astrology/panchang", headers=headers, params=params)
 data = res.json()
 
-# 4. Safe Data Extraction
-panchang = data.get('data', {}).get('panchang', {})
+# -- CRITICAL DEBUGGING: Print the raw API response to GitHub logs --
+print("ProKerala API Response:")
+print(json.dumps(data, indent=2))
+
+# 4. Safe Data Extraction across different JSON levels
+data_block = data.get('data', {})
+panchang = data_block.get('panchang', {})
 
 def get_name(key):
+    # Tithi, Nakshatra, Yoga, Karana are usually inside 'panchang'
     try:
         return panchang.get(key, [{}])[0].get('name', "उपलब्ध नहीं")
     except:
         return "उपलब्ध नहीं"
 
 def format_time(iso_str):
+    # Sunrise, Sunset are strings at the 'data' level
     if not iso_str: return "उपलब्ध नहीं"
     try:
-        dt = datetime.datetime.fromisoformat(iso_str)
+        dt = datetime.datetime.fromisoformat(iso_str).astimezone(ist)
         time_str = dt.strftime("%I:%M")
         ampm = "पूर्वाह्न" if dt.hour < 12 else "अपराह्न"
         return f"{time_str} {ampm}"
@@ -59,10 +70,11 @@ nakshatra = get_name('nakshatra')
 yoga = get_name('yoga')
 karana = get_name('karana')
 
-sunrise = format_time(panchang.get('sunrise', ""))
-sunset = format_time(panchang.get('sunset', ""))
-moonrise = format_time(panchang.get('moonrise', ""))
-moonset = format_time(panchang.get('moonset', ""))
+# Target the data_block for solar/lunar timings
+sunrise = format_time(data_block.get('sunrise', ""))
+sunset = format_time(data_block.get('sunset', ""))
+moonrise = format_time(data_block.get('moonrise', ""))
+moonset = format_time(data_block.get('moonset', ""))
 
 # 5. Draw the Full Dashboard Canvas (800x480 Landscape)
 image = Image.new('1', (800, 480), 255)
