@@ -37,13 +37,19 @@ params = {
 res = requests.get("https://api.prokerala.com/v2/astrology/panchang", headers=headers, params=params)
 data = res.json()
 
-# 4. Safe Data Extraction (Updated for flattened JSON structure)
+# 4. Safe Data Extraction
 data_block = data.get('data', {})
 
 def get_name(key):
-    # ProKerala places these directly inside the 'data' block
     try:
         return data_block.get(key, [{}])[0].get('name', "उपलब्ध नहीं")
+    except:
+        return "उपलब्ध नहीं"
+
+def get_end_time(key):
+    try:
+        iso_str = data_block.get(key, [{}])[0].get('end', '')
+        return format_time(iso_str)
     except:
         return "उपलब्ध नहीं"
 
@@ -57,10 +63,21 @@ def format_time(iso_str):
     except:
         return "उपलब्ध नहीं"
 
+# Extract names
 tithi = get_name('tithi')
 nakshatra = get_name('nakshatra')
 yoga = get_name('yoga')
 karana = get_name('karana')
+
+# Extract new specific data points
+vaara = data_block.get('vaara', 'उपलब्ध नहीं')
+try:
+    paksha = data_block.get('tithi', [{}])[0].get('paksha', '')
+except:
+    paksha = ""
+    
+tithi_end = get_end_time('tithi')
+nakshatra_end = get_end_time('nakshatra')
 
 sunrise = format_time(data_block.get('sunrise', ""))
 sunset = format_time(data_block.get('sunset', ""))
@@ -71,30 +88,38 @@ moonset = format_time(data_block.get('moonset', ""))
 image = Image.new('1', (800, 480), 255)
 draw = ImageDraw.Draw(image)
 
-font_header = ImageFont.truetype(font_path, 45)
+# Slightly reduced header font to comfortably fit the Day and Paksha
+font_header = ImageFont.truetype(font_path, 40) 
 font_title = ImageFont.truetype(font_path, 38)
 font_text = ImageFont.truetype(font_path, 30)
+font_small = ImageFont.truetype(font_path, 22) 
 
 # Main Outer Border
 draw.rectangle((10, 10, 790, 470), outline=0, width=6)
 
-# Header Section
+# Header Section (Now includes Day of the week and Paksha)
 display_date = now.strftime('%d / %m / %Y')
-draw.text((220, 25), f"कोलकाता पंचांग : {display_date}", font=font_header, fill=0)
+header_text = f"कोलकाता : {vaara}, {display_date} | {paksha}"
+draw.text((60, 25), header_text, font=font_header, fill=0)
 draw.line((10, 90, 790, 90), fill=0, width=4)
 
-# Left Column (Tithi, Nakshatra, Yoga, Karana)
+# Left Column (Tithi & Nakshatra now include End Times)
 draw.text((120, 110), "दैनिक पंचांग", font=font_title, fill=0)
 draw.line((40, 165, 360, 165), fill=0, width=2)
-draw.text((40, 190), f"तिथि: {tithi}", font=font_text, fill=0)
-draw.text((40, 250), f"नक्षत्र: {nakshatra}", font=font_text, fill=0)
-draw.text((40, 310), f"योग: {yoga}", font=font_text, fill=0)
-draw.text((40, 370), f"करण: {karana}", font=font_text, fill=0)
+
+draw.text((40, 185), f"तिथि: {tithi}", font=font_text, fill=0)
+draw.text((40, 220), f"({tithi_end} तक)", font=font_small, fill=0)
+
+draw.text((40, 260), f"नक्षत्र: {nakshatra}", font=font_text, fill=0)
+draw.text((40, 295), f"({nakshatra_end} तक)", font=font_small, fill=0)
+
+draw.text((40, 340), f"योग: {yoga}", font=font_text, fill=0)
+draw.text((40, 400), f"करण: {karana}", font=font_text, fill=0)
 
 # Vertical Center Divider
 draw.line((400, 90, 400, 470), fill=0, width=4)
 
-# Right Column (Sunrise, Sunset, Moonrise, Moonset)
+# Right Column (Unchanged)
 draw.text((500, 110), "सूर्य और चंद्र", font=font_title, fill=0)
 draw.line((440, 165, 760, 165), fill=0, width=2)
 draw.text((440, 190), f"सूर्योदय:   {sunrise}", font=font_text, fill=0)
