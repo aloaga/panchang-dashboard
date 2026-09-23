@@ -24,7 +24,6 @@ access_token = token_res.json().get("access_token")
 
 # 3. Fetch Data with Strict ISO Formatting
 ist = pytz.timezone('Asia/Kolkata')
-# microsecond=0 ensures strict compliance with API timestamp expectations
 now = datetime.datetime.now(ist).replace(microsecond=0)
 
 headers = {"Authorization": f"Bearer {access_token}"}
@@ -35,27 +34,20 @@ params = {
     "la": "hi"
 }
 
-print(f"Fetching Panchang for: {now.isoformat()}")
 res = requests.get("https://api.prokerala.com/v2/astrology/panchang", headers=headers, params=params)
 data = res.json()
 
-# -- CRITICAL DEBUGGING: Print the raw API response to GitHub logs --
-print("ProKerala API Response:")
-print(json.dumps(data, indent=2))
-
-# 4. Safe Data Extraction across different JSON levels
+# 4. Safe Data Extraction (Updated for flattened JSON structure)
 data_block = data.get('data', {})
-panchang = data_block.get('panchang', {})
 
 def get_name(key):
-    # Tithi, Nakshatra, Yoga, Karana are usually inside 'panchang'
+    # ProKerala places these directly inside the 'data' block
     try:
-        return panchang.get(key, [{}])[0].get('name', "उपलब्ध नहीं")
+        return data_block.get(key, [{}])[0].get('name', "उपलब्ध नहीं")
     except:
         return "उपलब्ध नहीं"
 
 def format_time(iso_str):
-    # Sunrise, Sunset are strings at the 'data' level
     if not iso_str: return "उपलब्ध नहीं"
     try:
         dt = datetime.datetime.fromisoformat(iso_str).astimezone(ist)
@@ -70,7 +62,6 @@ nakshatra = get_name('nakshatra')
 yoga = get_name('yoga')
 karana = get_name('karana')
 
-# Target the data_block for solar/lunar timings
 sunrise = format_time(data_block.get('sunrise', ""))
 sunset = format_time(data_block.get('sunset', ""))
 moonrise = format_time(data_block.get('moonrise', ""))
